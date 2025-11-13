@@ -1,46 +1,59 @@
-use serde::{Serialize, Deserialize};
-use bson::{oid::ObjectId, DateTime as BsonDateTime};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
-pub struct PagoDoc {
-    #[schema(example = "64dbf7c9e1a1f9c1a2b3c4d5")]
-    #[serde(rename = "_id")]
-    pub id: ObjectId,
-
-    #[schema(example = "UUID-VIAJE")]
-    pub id_viaje: String,
-
-    #[schema(example = "UUID-PERSONA-PAGADOR")]
-    pub id_pagador: String,
-
-    #[schema(example = "UUID-PERSONA-RECEPTOR")]
-    pub id_receptor: String,
-
-    #[schema(example = 2550, description = "En centavos (BOB)")]
-    pub monto_centavos: i64,
-
-    #[schema(example = "pendiente")]
-    pub estado: String, // pendiente|aprobado|fallido|reembolsado
-
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
-    pub creado_en: DateTime<Utc>,
-
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
-    pub actualizado_en: DateTime<Utc>,
+#[serde(rename_all = "lowercase")]
+pub enum MetodoPago {
+    Efectivo,
+    Tarjeta,
+    Billetera,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct CrearPagoDTO {
-    pub id_viaje: String,
-    pub id_pagador: String,
-    pub id_receptor: String,
-    pub monto_centavos: i64,
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum EstadoPago {
+    Pendiente,
+    Completado,
+    Fallido,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct ActualizarPagoDTO {
-    pub estado: Option<String>,       // aprobado, fallido, reembolsado
-    pub monto_centavos: Option<i64>,  // por si hay ajuste
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct DesgloseCosto {
+    pub tarifa_base: f64,
+    pub distancia_km: f64,
+    pub tiempo_minutos: i32,
+    pub subtotal: f64,
+    pub propina: f64,
+    pub total_final: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct Pago {
+    pub id_pago: String,
+    pub id_viaje: String,
+    pub id_pasajero: String,
+    pub id_conductor: String,
+    pub desglose_costo: DesgloseCosto,
+    pub metodo_pago: MetodoPago,
+    pub estado_pago: EstadoPago,
+    pub fecha_pago: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CrearPagoRequest {
+    pub id_viaje: String,
+    pub id_pasajero: String,
+    pub id_conductor: String,
+    pub desglose_costo: DesgloseCosto,
+    pub metodo_pago: MetodoPago,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ActualizarPagoRequest {
+    pub estado_pago: Option<EstadoPago>,
+    pub metodo_pago: Option<MetodoPago>,
+    pub desglose_costo: Option<DesgloseCosto>,
 }

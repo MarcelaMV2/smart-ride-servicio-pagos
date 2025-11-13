@@ -55,3 +55,35 @@ smart-ride-servicio-pagos/
 ├── README.md            // Descripción del microservicio, cómo correrlo y cómo usar los endpoints
 └── .gitignore           // Archivos y carpetas que no se suben al repo (target/, .env, etc.)
 
+
+---
+
+## Ejecución local
+
+- Ejecutar el microservicio 
+
+```
+cargo run
+```
+
+- Abrir en swagger
+
+```
+http://localhost:4000/apidocs/
+```
+
+- Probar los endpoints
+
+```
+GET  http://localhost:4000/pagos
+POST http://localhost:4000/pagos
+PATCH http://localhost:4000/pagos/id
+DELETE http://localhost:4000/pagos/id
+
+GET  http://localhost:4000/facturas
+POST http://localhost:4000/facturas
+PATCH http://localhost:4000/facturas/id
+DELETE http://localhost:4000/facturas/id
+```
+
+

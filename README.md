@@ -54,6 +54,7 @@ smart-ride-servicio-pagos/
 ├── Dockerfile           // Imagen del microservicio de pagos en modo release
 ├── README.md            // Descripción del microservicio, cómo correrlo y cómo usar los endpoints
 └── .gitignore           // Archivos y carpetas que no se suben al repo (target/, .env, etc.)
+```
 
 
 ---

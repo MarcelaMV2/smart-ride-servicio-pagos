@@ -87,4 +87,141 @@ PATCH http://localhost:4000/facturas/id
 DELETE http://localhost:4000/facturas/id
 ```
 
+## 🐳 Ejecución con Docker
+
+### **Prerrequisitos**
+
+- Docker >= 20.10
+- Docker Compose >= 2.0
+
+### **Iniciar servicios**
+
+```bash
+# Build y start
+docker compose up -d --build
+
+# Ver logs en tiempo real
+docker compose logs -f pagos-service
+
+# Verificar estado
+docker compose ps
+```
+
+### **Verificar funcionamiento**
+
+```bash
+# Health check
+curl http://localhost:4000/health
+
+# Swagger UI
+http://localhost:4000/apidocs/
+
+# Crear un pago de prueba
+curl -X POST http://localhost:4000/pagos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id_viaje": "123e4567-e89b-12d3-a456-426614174000",
+    "monto_base": 25.50,
+    "monto_adicional": 5.00,
+    "metodo_pago": "tarjeta"
+  }'
+```
+
+### **Detener servicios**
+
+```bash
+# Detener sin eliminar datos
+docker compose stop
+
+# Detener y eliminar contenedores
+docker compose down
+
+# Detener y eliminar TODO (incluye datos de MongoDB)
+docker compose down -v
+```
+
+## 🌐 Puertos Utilizados
+
+| Servicio | Puerto Host | Puerto Interno | Descripción |
+|----------|-------------|----------------|-------------|
+| **API Pagos** | `4000` | `4000` | API REST + Swagger |
+| **MongoDB** | `27018` | `27017` | Base de datos |
+
+> ⚠️ **Nota**: MongoDB se expone en el puerto `27018` del host para evitar conflictos con otros servicios que usen el puerto estándar `27017`.
+
+## 🔗 Conectar desde otros servicios Docker
+
+Si necesitas conectar otro servicio al servicio de pagos:
+
+### Opción A: Usar la misma red Docker
+
+```yaml
+# En el docker-compose.yml del otro servicio
+networks:
+  default:
+    external: true
+    name: smart-ride-pagos-network
+```
+
+### Opción B: Conectar vía host
+
+```yaml
+# Conectar a MongoDB desde otro servicio
+MONGO_HOST: host.docker.internal  # Windows/Mac
+MONGO_HOST: 172.17.0.1           # Linux
+MONGO_PORT: 27018
+```
+
+## 🧪 Desarrollo Local (sin Docker)
+
+```bash
+# 1. Asegurarse que MongoDB esté corriendo
+# En Linux/Mac:
+sudo systemctl start mongodb
+# En Windows:
+net start MongoDB
+
+# 2. Configurar .env para desarrollo local
+MONGO_URI=mongodb://localhost:27017
+SERVER_PORT=4000
+
+# 3. Ejecutar aplicación
+cargo run
+```
+
+## 🐛 Troubleshooting
+
+### Error: "Cannot connect to MongoDB"
+
+```bash
+# Verificar que MongoDB esté saludable
+docker compose exec mongo-pagos mongosh --eval "db.adminCommand('ping')"
+
+# Ver logs de MongoDB
+docker compose logs mongo-pagos
+
+# Reiniciar MongoDB
+docker compose restart mongo-pagos
+```
+
+### Error: "Address already in use"
+
+```bash
+# Verificar qué proceso usa el puerto 4000
+sudo lsof -i :4000  # Linux/Mac
+netstat -ano | findstr :4000  # Windows
+
+# Cambiar el puerto en .env y docker-compose.yml
+SERVER_PORT=4001
+```
+
+### Rebuild completo
+
+```bash
+# Limpiar todo y reconstruir
+docker compose down -v
+docker compose build --no-cache
+docker compose up -d
+```
+
 

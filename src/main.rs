@@ -3,10 +3,9 @@ mod db;
 mod handlers;
 
 use actix_cors::Cors;
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpServer, get, HttpResponse, Responder};
 use db::{init_db, AppState};
 use dotenvy::dotenv;
-use std::io;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -47,18 +46,22 @@ use utoipa_swagger_ui::SwaggerUi;
 )]
 struct ApiDoc;
 
-
 #[actix_web::main]
-async fn main() -> io::Result<()> {
+async fn main() -> std::io::Result<()> {
     dotenv().ok();
     env_logger::init();
 
+    println!("Iniciando Servicio de Pagos - Smart Ride");
+    println!("Versión: 1.0.0");
+    
+    //  Inicializar conexión a MongoDB
     let state: AppState = init_db().await;
 
     let openapi = ApiDoc::openapi();
 
-    println!("Servicio de Pagos escuchando en http://localhost:4000");
-    println!("Swagger UI en             http://localhost:4000/apidocs/");
+    println!("Servicio de Pagos escuchando en http://0.0.0.0:4000");
+    println!("Swagger UI en http://localhost:4000/apidocs/");
+    println!("Listo para recibir solicitudes");
 
     HttpServer::new(move || {
         let cors = Cors::permissive();
@@ -84,9 +87,20 @@ async fn main() -> io::Result<()> {
                 SwaggerUi::new("/apidocs/{_:.*}")
                     .url("/api-docs/openapi.json", openapi),
             )
+            // health check
+            .service(health_check)
     })
     .bind(("0.0.0.0", 4000))?
     .run()
     .await
+}
 
+#[get("/health")]
+async fn health_check() -> impl Responder {
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "ok",
+        "service": "pagos-service",
+        "version": "1.0.0",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
 }

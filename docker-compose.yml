@@ -1,27 +1,60 @@
-version: "3.9"
-
 services:
+  # MongoDB para Pagos
   mongo-pagos:
-    image: mongo:6         
-    container_name: mongo-pagos
-    restart: always
+    image: mongo:latest
+    container_name: pagos-mongodb
+    restart: unless-stopped
+    environment:
+  
+      MONGO_INITDB_ROOT_USERNAME: usuario
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: smart_ride_pagos
     ports:
-      - "27017:27017"
+      - "27018:27017" 
     volumes:
       - mongo_pagos_data:/data/db
+    networks:
+      - pagos-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
+  # Servicio de Pagos (Rust)
   pagos-service:
-    build: .              
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: smart-ride-servicio-pagos
-    restart: always
+    restart: unless-stopped
     depends_on:
-      - mongo-pagos
+      mongo-pagos:
+        condition: service_healthy
     environment:
-      MONGO_URI: "mongodb://mongo-pagos:27017"
-      MONGO_DB: "smart_ride_pagos"
-      RUST_LOG: "info"
+  
+      MONGO_URI: mongodb://usuario:password123@mongo-pagos:27017
+      MONGO_DB: smart_ride_pagos
+      MONGO_COL: pagos
+      SERVER_PORT: 4000
+      RUST_LOG: debug 
     ports:
       - "4000:4000"
+    networks:
+      - pagos-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   mongo_pagos_data:
+    driver: local
+
+networks:
+  pagos-network:
+    name: smart-ride-pagos-network
+    driver: bridge

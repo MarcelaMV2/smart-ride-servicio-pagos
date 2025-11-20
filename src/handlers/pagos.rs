@@ -1,239 +1,199 @@
-use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
-use chrono::Utc;
-use futures::TryStreamExt;
-use mongodb::bson::doc;
-
+use actix_web::{web, HttpResponse, get, post, patch, delete};
+use mongodb::Collection;
+use mongodb::bson::{doc, DateTime as BsonDateTime};
 use crate::db::AppState;
-use crate::models::{
-    Pago,
-    CrearPagoRequest,
-    ActualizarPagoRequest,
-    EstadoPago,
-};
+use crate::models::{Pago, CrearPagoRequest, ActualizarPagoRequest};
+use chrono::Utc;
+use uuid::Uuid;
 
-/// aquí va crear_pago, listar_pagos, obtener_pago, actualizar_pago, eliminar_pago
-/// (tal cual los tienes, solo ajustando los imports de arriba)
-/// Crear un pago (POST /pagos)
+/// Crear pago
 #[utoipa::path(
     post,
-    path = "/pagos",
+    path = "/api/v1/pagos",
+    tag = "Pagos",
     request_body = CrearPagoRequest,
     responses(
         (status = 201, description = "Pago creado", body = Pago),
-        (status = 500, description = "Error interno")
-    ),
-    tag = "Pagos"
+        (status = 400, description = "Datos inválidos")
+    )
 )]
 #[post("/pagos")]
 pub async fn crear_pago(
-    data: web::Data<AppState>,
+    state: web::Data<AppState>,
     body: web::Json<CrearPagoRequest>,
-) -> impl Responder {
-    let now = Utc::now();
-    //let id_pago = Uuid::new_v4().to_string();
-    let id_pago = chrono::Utc::now().timestamp_millis().to_string();
-
+) -> HttpResponse {
+    println!("📥 Creando nuevo pago para viaje {}", body.id_viaje);
+    
+    let collection: Collection<Pago> = state.pagos.clone();
+    
+    let count = collection.count_documents(doc! {}).await.unwrap_or(0);
+    let id_pago = (count + 1) as i32;
+    
     let nuevo_pago = Pago {
-        /* id: None, */
         id_pago,
-        id_viaje: body.id_viaje.clone(),
-        id_pasajero: body.id_pasajero.clone(),
-        id_conductor: body.id_conductor.clone(),
-        desglose_costo: body.desglose_costo.clone(),
+        id_viaje: body.id_viaje,
+        id_pasajero: body.id_pasajero,
+        id_conductor: body.id_conductor,
+        desglose_costo: crate::services::CalculoService::calcular_costo_viaje(
+            body.distancia_km,
+            body.duracion_minutos,
+            &crate::config::Settings::new(),
+        ),
         metodo_pago: body.metodo_pago.clone(),
-        estado_pago: EstadoPago::Pendiente,
-        fecha_pago: None,
-        created_at: now,
-        updated_at: now,
+        tipo_pago: crate::models::TipoPago::Simulado,
+        estado_pago: crate::models::EstadoPago::Completado,
+        referencia_pago: Some(format!("REF-{}", Uuid::new_v4().to_string()[..8].to_uppercase())),
+        fecha_pago: Utc::now(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     };
-
-    match data.pagos.insert_one(&nuevo_pago, None).await {
-        Ok(_) => HttpResponse::Created().json(nuevo_pago),
+    
+    match collection.insert_one(nuevo_pago.clone()).await {
+        Ok(_) => {
+            println!("✅ Pago {} creado exitosamente", id_pago);
+            HttpResponse::Created().json(nuevo_pago)
+        }
         Err(e) => {
-            eprintln!("Error insertando pago: {:?}", e);
+            eprintln!("❌ Error creando pago: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
-                "mensaje": "Error al crear el pago"
+                "error": format!("Error: {}", e)
             }))
         }
     }
 }
 
-/// Listar todos los pagos (GET /pagos)
+/// Listar todos los pagos
 #[utoipa::path(
     get,
-    path = "/pagos",
+    path = "/api/v1/pagos",
+    tag = "Pagos",
     responses(
-        (status = 200, description = "Lista de pagos", body = [Pago]),
-        (status = 500, description = "Error interno")
-    ),
-    tag = "Pagos"
+        (status = 200, description = "Lista de pagos", body = Vec<Pago>)
+    )
 )]
 #[get("/pagos")]
-pub async fn listar_pagos(data: web::Data<AppState>) -> impl Responder {
-    let mut cursor = match data.pagos.find(None, None).await {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Error listando pagos: {:?}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "mensaje": "Error al listar pagos"
-            }));
+pub async fn listar_pagos(state: web::Data<AppState>) -> HttpResponse {
+    let collection: Collection<Pago> = state.pagos.clone();
+    
+    match collection.find(doc! {}).await {
+        Ok(mut cursor) => {
+            let mut pagos = Vec::new();
+            while cursor.advance().await.unwrap_or(false) {
+                if let Ok(pago) = cursor.deserialize_current() {
+                    pagos.push(pago);
+                }
+            }
+            HttpResponse::Ok().json(pagos)
         }
-    };
-
-    let mut pagos: Vec<Pago> = Vec::new();
-    while let Some(doc) = cursor.try_next().await.unwrap_or(None) {
-        pagos.push(doc);
+        Err(e) => {
+            eprintln!("❌ Error listando pagos: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Error: {}", e)
+            }))
+        }
     }
-
-    HttpResponse::Ok().json(pagos)
 }
 
-/// Obtener un pago por id_pago (GET /pagos/{id_pago})
+/// Obtener pago por ID
 #[utoipa::path(
     get,
-    path = "/pagos/{id_pago}",
+    path = "/api/v1/pagos/{id}",
+    tag = "Pagos",
     params(
-        ("id_pago" = String, Path, description = "UUID del pago")
+        ("id" = i32, Path, description = "ID del pago")
     ),
     responses(
         (status = 200, description = "Pago encontrado", body = Pago),
-        (status = 404, description = "Pago no encontrado"),
-        (status = 500, description = "Error interno")
-    ),
-    tag = "Pagos"
+        (status = 404, description = "Pago no encontrado")
+    )
 )]
-#[get("/pagos/{id_pago}")]
+#[get("/pagos/{id}")]
 pub async fn obtener_pago(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-) -> impl Responder {
-    let id_pago = path.into_inner();
-    let filtro = doc! { "id_pago": &id_pago };
-
-    match data.pagos.find_one(filtro, None).await {
+    state: web::Data<AppState>,
+    path: web::Path<i32>,
+) -> HttpResponse {
+    let id = path.into_inner();
+    let collection: Collection<Pago> = state.pagos.clone();
+    
+    match collection.find_one(doc! { "id_pago": id }).await {
         Ok(Some(pago)) => HttpResponse::Ok().json(pago),
         Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
-            "mensaje": "Pago no encontrado"
+            "error": format!("Pago {} no encontrado", id)
         })),
-        Err(e) => {
-            eprintln!("Error buscando pago: {:?}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "mensaje": "Error al buscar pago"
-            }))
-        }
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": format!("Error: {}", e)
+        }))
     }
 }
 
-/// Actualizar un pago (PATCH /pagos/{id_pago})
+/// Actualizar pago
 #[utoipa::path(
     patch,
-    path = "/pagos/{id_pago}",
-    request_body = ActualizarPagoRequest,
+    path = "/api/v1/pagos/{id}",
+    tag = "Pagos",
     params(
-        ("id_pago" = String, Path, description = "UUID del pago")
+        ("id" = i32, Path, description = "ID del pago")
     ),
+    request_body = ActualizarPagoRequest,
     responses(
         (status = 200, description = "Pago actualizado", body = Pago),
-        (status = 404, description = "Pago no encontrado"),
-        (status = 500, description = "Error interno")
-    ),
-    tag = "Pagos"
+        (status = 404, description = "Pago no encontrado")
+    )
 )]
-#[patch("/pagos/{id_pago}")]
+#[patch("/pagos/{id}")]
 pub async fn actualizar_pago(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
+    state: web::Data<AppState>,
+    path: web::Path<i32>,
     body: web::Json<ActualizarPagoRequest>,
-) -> impl Responder {
-    let id_pago = path.into_inner();
-    let filtro = doc! { "id_pago": &id_pago };
-
-    // 1) Buscar el pago
-    let mut pago = match data.pagos.find_one(filtro.clone(), None).await {
-        Ok(Some(p)) => p,
-        Ok(None) => {
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "mensaje": "Pago no encontrado"
-            }));
-        }
-        Err(e) => {
-            eprintln!("Error buscando pago para actualizar: {:?}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "mensaje": "Error al buscar pago"
-            }));
-        }
-    };
-
-    // 2) Aplicar cambios en el struct
+) -> HttpResponse {
+    let id = path.into_inner();
+    let collection: Collection<Pago> = state.pagos.clone();
+    
+    let now_bson = BsonDateTime::from_millis(Utc::now().timestamp_millis());
+    let mut update_doc = doc! { "$set": { "updated_at": now_bson } };
+    
     if let Some(estado) = &body.estado_pago {
-        pago.estado_pago = estado.clone();
-        if let EstadoPago::Completado = estado {
-            pago.fecha_pago = Some(Utc::now());
+        update_doc.get_document_mut("$set").unwrap().insert("estado_pago", format!("{:?}", estado).to_lowercase());
+    }
+    
+    match collection.update_one(doc! { "id_pago": id }, update_doc).await {
+        Ok(result) if result.matched_count > 0 => {
+            match collection.find_one(doc! { "id_pago": id }).await {
+                Ok(Some(pago)) => HttpResponse::Ok().json(pago),
+                _ => HttpResponse::InternalServerError().finish(),
+            }
         }
-    }
-    if let Some(metodo) = &body.metodo_pago {
-        pago.metodo_pago = metodo.clone();
-    }
-    if let Some(desglose) = &body.desglose_costo {
-        pago.desglose_costo = desglose.clone();
-    }
-    pago.updated_at = Utc::now();
-
-    // 3) Guardar el pago actualizado
-    match data
-        .pagos
-        .replace_one(filtro, &pago, None)
-        .await
-    {
-        Ok(_) => HttpResponse::Ok().json(pago),
-        Err(e) => {
-            eprintln!("Error actualizando pago: {:?}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "mensaje": "Error al actualizar pago"
-            }))
-        }
+        _ => HttpResponse::NotFound().json(serde_json::json!({
+            "error": format!("Pago {} no encontrado", id)
+        }))
     }
 }
 
-/// Eliminar un pago (DELETE /pagos/{id_pago}`)
+/// Eliminar pago
 #[utoipa::path(
     delete,
-    path = "/pagos/{id_pago}",
+    path = "/api/v1/pagos/{id}",
+    tag = "Pagos",
     params(
-        ("id_pago" = String, Path, description = "UUID del pago")
+        ("id" = i32, Path, description = "ID del pago")
     ),
     responses(
-        (status = 200, description = "Pago eliminado"),
-        (status = 404, description = "Pago no encontrado"),
-        (status = 500, description = "Error interno")
-    ),
-    tag = "Pagos"
+        (status = 204, description = "Pago eliminado"),
+        (status = 404, description = "Pago no encontrado")
+    )
 )]
-#[delete("/pagos/{id_pago}")]
+#[delete("/pagos/{id}")]
 pub async fn eliminar_pago(
-    data: web::Data<AppState>,
-    path: web::Path<String>,
-) -> impl Responder {
-    let id_pago = path.into_inner();
-    let filtro = doc! { "id_pago": &id_pago };
-
-    match data.pagos.delete_one(filtro, None).await {
-        Ok(result) => {
-            if result.deleted_count == 0 {
-                HttpResponse::NotFound().json(serde_json::json!({
-                    "mensaje": "Pago no encontrado"
-                }))
-            } else {
-                HttpResponse::Ok().json(serde_json::json!({
-                    "mensaje": "Pago eliminado correctamente"
-                }))
-            }
-        }
-        Err(e) => {
-            eprintln!("Error eliminando pago: {:?}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "mensaje": "Error al eliminar pago"
-            }))
-        }
+    state: web::Data<AppState>,
+    path: web::Path<i32>,
+) -> HttpResponse {
+    let id = path.into_inner();
+    let collection: Collection<Pago> = state.pagos.clone();
+    
+    match collection.delete_one(doc! { "id_pago": id }).await {
+        Ok(result) if result.deleted_count > 0 => HttpResponse::NoContent().finish(),
+        _ => HttpResponse::NotFound().json(serde_json::json!({
+            "error": format!("Pago {} no encontrado", id)
+        }))
     }
 }

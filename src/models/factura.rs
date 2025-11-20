@@ -13,44 +13,42 @@ pub struct DetalleViaje {
     pub origen: String,
     pub destino: String,
     pub distancia_km: f64,
-    pub total: f64,
+    pub duracion_minutos: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum EstadoFactura {
     Emitida,
-    Enviada,
     Anulada,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct Factura {
-    pub id_factura: String,
-    pub numero_factura: String,
-    pub id_pago: String,
-    pub id_viaje: String,
-    pub datos_pasajero: DatosPasajero,
+    //  Usar i32
+    pub id_factura: i32,
+    pub id_pago: i32,
+    pub id_viaje: i32,
+    pub id_pasajero: i32,
+    pub id_conductor: i32,
+    
     pub detalle_viaje: DetalleViaje,
+    pub costo_total: f64,
     pub estado_factura: EstadoFactura,
+    pub numero_factura: String,
+    
     pub fecha_emision: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CrearFacturaRequest {
-    pub numero_factura: String,
-    pub id_pago: String,
-    pub id_viaje: String,
-    pub datos_pasajero: DatosPasajero,
-    pub detalle_viaje: DetalleViaje,
-    pub estado_factura: Option<EstadoFactura>,
+    pub id_pago: i32,
+    pub origen: String,
+    pub destino: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ActualizarFacturaRequest {
     pub estado_factura: Option<EstadoFactura>,
-    pub datos_pasajero: Option<DatosPasajero>,
-    pub detalle_viaje: Option<DetalleViaje>,
 }

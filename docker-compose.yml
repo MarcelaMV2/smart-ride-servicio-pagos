@@ -5,12 +5,11 @@ services:
     container_name: pagos-mongodb
     restart: unless-stopped
     environment:
-  
       MONGO_INITDB_ROOT_USERNAME: usuario
-      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_ROOT_PASSWORD: usuario123
       MONGO_INITDB_DATABASE: smart_ride_pagos
     ports:
-      - "27018:27017" 
+      - "27018:27017"
     volumes:
       - mongo_pagos_data:/data/db
     networks:
@@ -33,12 +32,17 @@ services:
       mongo-pagos:
         condition: service_healthy
     environment:
-  
-      MONGO_URI: mongodb://usuario:password123@mongo-pagos:27017
+      # MongoDB
+      MONGO_URI: mongodb://usuario:usuario123@mongo-pagos:27017
       MONGO_DB: smart_ride_pagos
       MONGO_COL: pagos
+      
+      # Server
       SERVER_PORT: 4000
-      RUST_LOG: debug 
+      
+      # Rust
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
     ports:
       - "4000:4000"
     networks:

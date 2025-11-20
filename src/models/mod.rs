@@ -1,9 +1,11 @@
 pub mod pago;
 pub mod factura;
+pub mod transaccion_fallida;
 
 pub use pago::{
     Pago,
     MetodoPago,
+    TipoPago,
     EstadoPago,
     DesgloseCosto,
     CrearPagoRequest,
@@ -12,9 +14,10 @@ pub use pago::{
 
 pub use factura::{
     Factura,
-    DatosPasajero,
     DetalleViaje,
     EstadoFactura,
     CrearFacturaRequest,
     ActualizarFacturaRequest,
 };
+
+pub use transaccion_fallida::TransaccionFallida;

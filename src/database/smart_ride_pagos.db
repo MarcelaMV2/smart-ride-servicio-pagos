@@ -1,0 +1,53 @@
+
+-- PAGOS 
+{
+  "_id": ObjectId("..."),
+  "id_pago": 1001,            // ← Number (entero), no string
+  "id_viaje": 1001,           // ← Number (BIGINT → Number en JS/JSON)
+  "id_pasajero": 10,          // ← Number (igual que usuarios.id_usuario)
+  "id_conductor": 22,         // ← Number (igual que conductores.id_conductor)
+  "desglose_costo": {
+    "tarifa_base": 10,
+    "subtotal": 35,
+    "total_final": 35
+  },
+  "metodo_pago": "tarjeta",
+  "tipo_pago": "simulado",
+  "estado_pago": "completado",
+  "fecha_pago": ISODate("2025-11-19T15:30:00Z"),
+  "created_at": ISODate("2025-11-19T15:29:50Z")
+}
+
+
+
+-- FACTURAS
+{
+  "_id": ObjectId("..."),
+  "id_factura": 2001,
+  "id_pago": 1001,            // ← Number
+  "id_viaje": 1001,           // ← Number
+  "id_pasajero": 10,          // ← Number (igual que usuarios.id_usuario)
+  "id_conductor": 22,
+  "detalle_viaje": {
+    "origen": "Av. América",
+    "destino": "UMSS",
+  },
+  "costo_total": 35,
+  "estado_factura": "emitida",
+  "fecha_emision": ISODate("2025-11-19T15:30:05Z"),
+  "created_at": ISODate("2025-11-19T15:30:05Z")
+}
+
+
+
+-- transacciones_fallidas
+{
+  "_id": ObjectId("..."),
+  "id_transaccion": 3001,
+  "id_pago": 1002,            // ← Number
+  "id_viaje": 1002            // ← Number
+  "tipo_error": "CARD_DECLINED",
+  "mensaje_error": "Tarjeta rechazada",
+  "fecha_intento": ISODate("2025-11-19T15:31:00Z"),
+  "created_at": ISODate("2025-11-19T15:31:00Z")
+}

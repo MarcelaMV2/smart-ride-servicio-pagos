@@ -1,21 +1,57 @@
 [package]
 name = "smart-ride-servicio-pagos"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
-actix-web = "4"
-actix-cors = "0.6"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-mongodb = { version = "2.8", features = ["tokio-runtime"] }
+# Web Framework
+actix-web = "4.12"
+actix-cors = "0.7"
+actix-rt = "2.10"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# MongoDB
+mongodb = "3.3"
 futures = "0.3"
-uuid = { version = "1", features = ["v4", "serde"] }
+
+# RabbitMQ
+lapin = "2.5"
+async-trait = "0.1"
+
+# JWT
+jsonwebtoken = "9.3"
+
+# UUID
+uuid = { version = "1.12", features = ["v4", "serde"] }
+
+# Environment
 dotenvy = "0.15"
+
+# Date/Time
 chrono = { version = "0.4", features = ["serde"] }
 
-utoipa = { version = "4", features = ["actix_extras", "chrono", "uuid"] }
-utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
+# Tokio
+tokio = { version = "1.43", features = ["full"] }
 
+# Swagger/OpenAPI
+utoipa = { version = "5.4", features = ["actix_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9.0", features = ["actix-web"] }
+
+# Logging
 log = "0.4"
 env_logger = "0.11"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error Handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Random (para simular pagos)
+rand = "0.8"
+
+# HTTP Client (opcional, para validar tokens)
+reqwest = { version = "0.12", features = ["json"], optional = true }
